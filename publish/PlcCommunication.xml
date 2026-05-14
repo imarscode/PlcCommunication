@@ -1,0 +1,839 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>PlcCommunication</name>
+    </assembly>
+    <members>
+        <member name="T:PlcCommunication.Core.IReadWriteNet">
+            <summary>
+            所有 PLC 通信客户端的核心契约。
+            实现者提供原始字节级别的读/写和连接生命周期。
+            类型化的便捷方法（ReadInt32Async、WriteFloatAsync 等）
+            作为 <see cref="T:PlcCommunication.Core.IReadWriteNetExtensions"/> 中的扩展方法提供。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Core.IReadWriteNet.ConnectAsync">
+            <summary>连接到 PLC 设备。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.IReadWriteNet.DisconnectAsync">
+            <summary>断开与 PLC 设备的连接。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.IReadWriteNet.IsConnected">
+            <summary>设备当前是否已连接。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.IReadWriteNet.ReadAsync(System.String,System.UInt16)">
+            <summary>从指定地址读取原始字节。</summary>
+            <param name="address">协议特定的地址字符串。</param>
+            <param name="length">要读取的字节数。</param>
+        </member>
+        <member name="M:PlcCommunication.Core.IReadWriteNet.WriteAsync(System.String,System.Byte[])">
+            <summary>将原始字节写入指定地址。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.IReadWriteNet.ReadBoolAsync(System.String)">
+            <summary>从位地址读取单个布尔值。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.IReadWriteNet.WriteAsync(System.String,System.Boolean)">
+            <summary>将单个布尔值写入位地址。</summary>
+        </member>
+        <member name="T:PlcCommunication.Core.IReadWriteNetExtensions">
+            <summary>
+            在任何 <see cref="T:PlcCommunication.Core.IReadWriteNet"/> 上提供类型化读/写操作的扩展方法。
+            这些方法使用设备的 <see cref="T:PlcCommunication.DataConvert.IByteTransform"/> 进行数据转换。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Core.NetworkDeviceBase">
+            <summary>
+            所有 PLC 协议客户端的抽象基类。处理连接生命周期、
+            线程安全（通过 SemaphoreSlim）、可配置超时、自动重连、
+            指数退避重试和诊断跟踪。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.IpAddress">
+            <summary>PLC IP 地址或主机名。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.Port">
+            <summary>PLC TCP 端口。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.ConnectTimeout">
+            <summary>连接超时时间（毫秒）。默认 5000。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.SendTimeout">
+            <summary>发送超时时间（毫秒）。默认 3000。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.ReceiveTimeout">
+            <summary>接收超时时间（毫秒）。默认 5000。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.RetryCount">
+            <summary>失败时的重试次数。默认 3。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.RetryIntervalMs">
+            <summary>重试之间的基础间隔（毫秒）。默认 100。</summary>
+            <remarks>实际延迟 = RetryIntervalMs * 2^attempt（指数退避）。</remarks>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.ResponseHeaderLength">
+            <summary>用于帧定界的响应头前缀长度。默认 4 字节。</summary>
+            <remarks>如果协议对长度前缀帧定界使用不同的头大小，请重写此属性。</remarks>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.IsConnected">
+            <inheritdoc/>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.ByteTransform">
+            <summary>此协议的字节序转换器。</summary>
+        </member>
+        <member name="F:PlcCommunication.Core.NetworkDeviceBase._tcpClient">
+            <summary>用于连接的 TCP 客户端。派生类可访问。</summary>
+        </member>
+        <member name="F:PlcCommunication.Core.NetworkDeviceBase._stream">
+            <summary>用于数据 I/O 的网络流。派生类可访问。</summary>
+        </member>
+        <member name="F:PlcCommunication.Core.NetworkDeviceBase._disposed">
+            <summary>对象是否已释放。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.Dispose">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.Dispose(System.Boolean)">
+            <summary>释放托管/非托管资源。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.BuildReadCommand(System.String,System.UInt16)">
+            <summary>构建用于读取操作的原始协议请求字节。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.BuildWriteCommand(System.String,System.Byte[])">
+            <summary>构建用于写入操作的原始协议请求字节。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.CheckResponse(System.Byte[],System.Byte[])">
+            <summary>验证并从响应字节中提取数据。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.GetResponseLength(System.Byte[])">
+            <summary>从响应头中提取预期的总响应长度。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.ReceiveAsync(System.Threading.CancellationToken)">
+            <summary>
+            从网络流中接收响应字节。
+            默认使用长度前缀帧定界：先读取 <see cref="P:PlcCommunication.Core.NetworkDeviceBase.ResponseHeaderLength"/>
+            字节，调用 <see cref="M:PlcCommunication.Core.NetworkDeviceBase.GetResponseLength(System.Byte[])"/>，然后读取剩余数据。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.ReadFromCoreServerAsync(System.Byte[])">
+            <summary>
+            发送命令并接收响应的核心方法。
+            管理锁定、连接、发送、接收和响应检查。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.ReadStreamAsync(System.Net.Sockets.NetworkStream,System.Byte[],System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>从流中读取指定数量的字节，处理部分读取情况。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.ConnectAsync">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.DisconnectAsync">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.CleanupConnection">
+            <summary>清理 TCP 客户端和流资源。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.ReadAsync(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.WriteAsync(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.ReadBoolAsync(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.WriteAsync(System.String,System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="P:PlcCommunication.Core.NetworkDeviceBase.EnableTrace">
+            <inheritdoc/>
+        </member>
+        <member name="E:PlcCommunication.Core.NetworkDeviceBase.TraceMessage">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Core.NetworkDeviceBase.Trace(PlcCommunication.Diagnostics.TraceLevel,System.String,System.Int64)">
+            <inheritdoc/>
+        </member>
+        <member name="T:PlcCommunication.Core.OperateResult">
+            <summary>
+            不返回数据的操作结果对象。每个公共API方法返回此对象或 <see cref="T:PlcCommunication.Core.OperateResult`1"/>，
+            通信失败时不会抛出异常。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Core.OperateResult.IsSuccess">
+            <summary>操作成功时为 true。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.OperateResult.Message">
+            <summary>结果的人类可读描述。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.OperateResult.ErrorCode">
+            <summary>协议相关或框架相关的错误码。零通常表示成功。</summary>
+        </member>
+        <member name="P:PlcCommunication.Core.OperateResult.Exception">
+            <summary>导致失败的异常（如果有）。</summary>
+        </member>
+        <member name="M:PlcCommunication.Core.OperateResult.CopyErrorFrom(PlcCommunication.Core.OperateResult)">
+            <summary>从另一个失败结果复制错误信息。</summary>
+        </member>
+        <member name="T:PlcCommunication.Core.OperateResult`1">
+            <summary>
+            返回类型为 <typeparamref name="T"/> 的数据的操作结果对象。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Core.OperateResult`1.Content">
+            <summary>操作返回的数据，仅在 <see cref="P:PlcCommunication.Core.OperateResult.IsSuccess"/> 为 true 时有效。</summary>
+        </member>
+        <member name="T:PlcCommunication.Core.PlcCommunicationException">
+            <summary>
+            仅在编程/配置错误时抛出的异常
+            （无效的地址格式、已释放的对象使用等）。
+            通信失败始终返回 <see cref="T:PlcCommunication.Core.OperateResult"/>。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Core.PlcCommunicationException.ErrorCode">
+            <summary>可选的框架相关错误码。</summary>
+        </member>
+        <member name="T:PlcCommunication.DataConvert.ByteTransformHelper">
+            <summary>
+            辅助方法，将 <see cref="T:PlcCommunication.DataConvert.IByteTransform"/> 操作与
+            <see cref="T:PlcCommunication.Core.OperateResult`1"/> 返回模式结合。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.DataConvert.IByteTransform">
+            <summary>
+            定义基本类型与字节数组之间的字节序转换。
+            每种协议设置适当的实现（小端序或大端序）。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.DataConvert.RegularBytesTransform">
+            <summary>
+            小端字节序转换（Intel顺序）。用于三菱MC和罗克韦尔CIP协议。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.DataConvert.ReverseBytesTransform">
+            <summary>
+            大端字节序转换（网络顺序）。用于西门子S7和Modbus协议。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Diagnostics.TraceLevel">
+            <summary>跟踪消息的严重级别。</summary>
+        </member>
+        <member name="T:PlcCommunication.Diagnostics.TraceEventArgs">
+            <summary>跟踪消息的事件参数。</summary>
+        </member>
+        <member name="T:PlcCommunication.Diagnostics.ITraceable">
+            <summary>
+            在通信设备上启用诊断跟踪。
+            启用后，设备会发出发送/接收字节的十六进制转储、
+            连接状态变化和计时信息。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Diagnostics.ITraceable.EnableTrace">
+            <summary>启用或禁用诊断跟踪。</summary>
+        </member>
+        <member name="E:PlcCommunication.Diagnostics.ITraceable.TraceMessage">
+            <summary>当有跟踪消息时触发。</summary>
+        </member>
+        <member name="M:PlcCommunication.Diagnostics.ITraceable.Trace(PlcCommunication.Diagnostics.TraceLevel,System.String,System.Int64)">
+            <summary>如果跟踪已启用，则发出跟踪消息。</summary>
+        </member>
+        <member name="T:PlcCommunication.Diagnostics.LogManager">
+            <summary>
+            用于全局跟踪路由的静态日志管理器。订阅
+            <see cref="E:PlcCommunication.Diagnostics.ITraceable.TraceMessage"/> 事件并转发到注册的接收器。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Diagnostics.LogManager.MinimumLevel">
+            <summary>获取或设置转发到接收器的最小跟踪级别。</summary>
+        </member>
+        <member name="M:PlcCommunication.Diagnostics.LogManager.AddSink(System.Action{PlcCommunication.Diagnostics.TraceEventArgs})">
+            <summary>注册一个接收所有跟踪事件的接收器。</summary>
+        </member>
+        <member name="M:PlcCommunication.Diagnostics.LogManager.RemoveSink(System.Action{PlcCommunication.Diagnostics.TraceEventArgs})">
+            <summary>移除之前注册的接收器。</summary>
+        </member>
+        <member name="M:PlcCommunication.Diagnostics.LogManager.ClearSinks">
+            <summary>清除所有已注册的接收器。</summary>
+        </member>
+        <member name="M:PlcCommunication.Diagnostics.LogManager.Subscribe(PlcCommunication.Diagnostics.ITraceable)">
+            <summary>
+            订阅设备的跟踪事件并转发到所有已注册的接收器。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Diagnostics.LogManager.Unsubscribe(PlcCommunication.Diagnostics.ITraceable)">
+            <summary>取消订阅设备的跟踪事件。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet">
+            <summary>
+            Allen-Bradley CIP（EtherNet/IP）协议客户端。
+            支持ControlLogix、CompactLogix、MicroLogix和SLC系列PLC。
+            使用基于标签的寻址（例如"MyTag"、"MyTag[0].Member"）。
+            默认端口：44818。
+            
+            EIP封装头部所有多字节字段使用大端序（网络字节序）。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.SessionTimeout">
+            <summary>CIP会话注册的连接超时时间。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.Slot">
+            <summary>PLC槽号（用于背板/机架式PLC）。默认0。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.ConnectAsync">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.BuildSendRRData(System.Byte[])">
+            <summary>构建封装了CIP消息的EIP SendRRData（0x006F）命令。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.BuildEIPHeader(System.UInt16,System.Int32)">
+            <summary>
+            构建24字节的EIP封装头部。
+            所有字段使用大端序（网络字节序），这是EIP规范要求。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.ParseTagName(System.String)">
+            <summary>从地址字符串中提取标签名称（移除数组/括号表示法用于路径）。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.AllenBradley.AllenBradleyCipNet.GetCipErrorDescription(System.Byte)">
+            <summary>获取CIP通用状态码描述。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet">
+            <summary>
+            三菱MC(Melsec)协议客户端，使用基于TCP的3E二进制帧。
+            支持Q、L、QnA和FX系列PLC。
+            默认端口：5006（TCP）。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.NetworkNumber">
+            <summary>PLC网络编号。默认0。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.PLCNumber">
+            <summary>PLC编号。默认0xFF（未指定）。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.IONumber">
+            <summary>IO编号。默认0x03FF。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.StationNumber">
+            <summary>站号。默认0。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.Timer">
+            <summary>监控定时器，以100ms为单位。默认10（1秒）。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.GetDeviceCode(System.Char)">
+            <summary>
+            三菱MC 3E二进制帧设备代码映射。
+            使用标准二进制编码，非ASCII值。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.#ctor(System.String,System.Int32)">
+            <summary>
+            创建新的三菱MC客户端。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.ReceiveAsync(System.Threading.CancellationToken)">
+            <summary>
+            三菱3E协议响应没有长度字段，需要根据请求推断。
+            重写整个接收逻辑。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Mitsubishi.MitsubishiMcNet.GetErrorDescription(System.UInt16)">
+            <summary>获取三菱MC错误码描述。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Modbus.ModbusAsciiNet">
+            <summary>
+            Modbus ASCII 客户端。使用 ASCII 帧格式与 Modbus 设备通信
+            （以 ':' 开头，CR/LF 结束，LRC 校验）。设计用于 TCP 封装
+            （串口转以太网转换器）或直接串口。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.StationId">
+            <summary>Modbus 从站地址。默认为 1。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.EncodeAsciiFrame(System.Byte[])">
+            <summary>编码 Modbus ASCII 帧：":" + hex(地址 + 功能码 + 数据 + LRC) + CR + LF。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.DecodeAsciiFrame(System.Byte[])">
+            <summary>解码 Modbus ASCII 帧，去除 ':' 和 CR/LF，返回经过 LRC 验证的二进制数据。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.ReceiveAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.ReadBoolAsync(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusAsciiNet.WriteAsync(System.String,System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Modbus.ModbusFunction">
+            <summary>Modbus 功能码常量。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Modbus.ModbusHelper">
+            <summary>Modbus 的 CRC-16/LRC 计算辅助类。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusHelper.CalculateCRC16(System.Byte[])">
+            <summary>计算给定数据的 CRC-16/MODBUS。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusHelper.VerifyCRC16(System.Byte[])">
+            <summary>验证 Modbus RTU 消息的 CRC-16。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusHelper.CalculateCRC16(System.Byte[],System.Int32,System.Int32)">
+            <summary>计算数据子范围的 CRC-16。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusHelper.CalculateLRC(System.Byte[])">
+            <summary>计算 Modbus ASCII 的 LRC（纵向冗余校验）。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusHelper.VerifyLRC(System.Byte[])">
+            <summary>验证 Modbus ASCII 消息的 LRC。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusHelper.CalculateLRC(System.Byte[],System.Int32,System.Int32)">
+            <summary>计算数据子范围的 LRC。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusHelper.ParseAddress(System.String)">
+            <summary>解析 Modbus 地址字符串。支持十进制和十六进制（0x 前缀）。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Modbus.ModbusRtuNet">
+            <summary>
+            Modbus RTU 客户端。使用 RTU 帧格式与 Modbus 设备通信。
+            设计用于通过 TCP（串口转以太网转换器）或任何流式传输。
+            消息使用 CRC-16 校验，无 MBAP 头。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Modbus.ModbusRtuNet.StationId">
+            <summary>Modbus 从站地址。默认为 1。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.#ctor(System.String,System.Int32,System.Byte)">
+            <summary>
+            创建新的 Modbus RTU 客户端。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.#ctor">
+            <summary>
+            使用默认设置创建。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.ReceiveAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.ReadBoolAsync(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusRtuNet.WriteAsync(System.String,System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Modbus.ModbusTcpNet">
+            <summary>
+            Modbus TCP 客户端。通过 TCP/IP 与 Modbus 设备通信。
+            支持功能码 0x01-0x10 读写线圈和寄存器。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Modbus.ModbusTcpNet.StationId">
+            <summary>Modbus 单元/从站标识符。默认为 1。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.#ctor(System.String,System.Int32,System.Byte)">
+            <summary>
+            创建新的 Modbus TCP 客户端。
+            </summary>
+            <param name="ipAddress">PLC IP 地址或主机名。</param>
+            <param name="port">TCP 端口号（默认为 502）。</param>
+            <param name="stationId">单元 ID（默认为 1）。</param>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.#ctor">
+            <summary>
+            使用默认设置（127.0.0.1:502）创建新的 Modbus TCP 客户端。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.ReadBoolAsync(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Modbus.ModbusTcpNet.WriteAsync(System.String,System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Omron.OmronFinsNet">
+            <summary>
+            Omron FINS协议客户端，基于TCP（FINS/TCP）。
+            与Omron CJ、CS、CP和NJ系列PLC通信。
+            默认端口：9600（TCP）。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Omron.OmronFinsNet.DstNetwork">
+            <summary>FINS目标网络地址。默认0。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Omron.OmronFinsNet.DstNode">
+            <summary>FINS目标节点（IP最后一段）。默认1。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Omron.OmronFinsNet.DstUnit">
+            <summary>FINS目标单元地址。默认0（CPU）。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Omron.OmronFinsNet.SrcNetwork">
+            <summary>FINS源网络地址。默认0。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Omron.OmronFinsNet.SrcNode">
+            <summary>FINS源节点（由握手获取）。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Omron.OmronFinsNet.SrcUnit">
+            <summary>FINS源单元地址。默认0（CPU）。</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Omron.OmronFinsNet.FinsCommandRead">
+            <summary>FINS命令：内存区域读取。</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Omron.OmronFinsNet.FinsCommandWrite">
+            <summary>FINS命令：内存区域写入。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.#ctor(System.String,System.Int32)">
+            <summary>
+            创建新的Omron FINS客户端。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.ConnectAsync">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.FinsTcpHandshake">
+            <summary>
+            FINS/TCP 握手过程。
+            发送 FINS/TCP 连接请求（命令码0x0000）携带客户端节点地址，
+            接收服务端返回的服务端节点地址。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.ParseAddress(System.String)">
+            <summary>
+            解析Omron内存区域地址。
+            格式：D100（DM）、W100（工作区）、CIO100（CIO）、H100（保持区）等。
+            位寻址：D100.05
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronFinsNet.GetFinsErrorDescription(System.UInt16)">
+            <summary>获取FINS错误码描述。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Omron.OmronHostLinkNet">
+            <summary>
+            Omron HostLink协议客户端（串行/RS-232C封装于TCP之上）。
+            使用带FCS校验和的ASCII命令。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Omron.OmronHostLinkNet.UnitNumber">
+            <summary>单元号（00-31）。默认00。</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Omron.OmronHostLinkNet.ReadHeader">
+            <summary>头部代码："RR"表示读取，"WR"表示写入。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronHostLinkNet.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronHostLinkNet.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronHostLinkNet.ReceiveAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronHostLinkNet.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronHostLinkNet.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Omron.OmronHostLinkNet.ParseAddress(System.String)">
+            <summary>
+            解析Omron HostLink地址。
+            DM地址："D100" -> 区域"DM"，地址100
+            CIO地址："CIO100" -> 区域"CIO"，地址100
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.S7AddressParser">
+            <summary>
+            将西门子S7地址字符串解析为<see cref="T:PlcCommunication.Protocols.Siemens.S7AddressData"/>。
+            支持以下格式：
+            <list type="bullet">
+              <item><c>DB100.DBW10</c> — DB字</item>
+              <item><c>DB100.DBD10</c> — DB双字</item>
+              <item><c>DB100.DBB10</c> — DB字节</item>
+              <item><c>DB100.DBX10.0</c> — DB位</item>
+              <item><c>M100.0</c> — 中间继电器位</item>
+              <item><c>MB100</c> — 中间继电器字节</item>
+              <item><c>MW100</c> — 中间继电器字</item>
+              <item><c>MD100</c> — 中间继电器双字</item>
+              <item><c>I0.0</c> / <c>IB0</c> — 输入</item>
+              <item><c>Q0.0</c> / <c>QB0</c> — 输出</item>
+              <item><c>T0</c> — 定时器</item>
+              <item><c>C0</c> — 计数器</item>
+            </list>
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.S7AddressParser.Parse(System.String)">
+            <summary>
+            解析S7地址字符串。
+            </summary>
+            <exception cref="T:PlcCommunication.Core.PlcCommunicationException">当地址格式无效时抛出。</exception>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.S7Area">
+            <summary>S7区域标识符，用于S7内存模型。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.S7TransportSize">
+            <summary>S7传输大小标识符。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.S7Function">
+            <summary>S7功能码，用于PDU请求。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.S7MessageType">
+            <summary>S7消息类型（ROSCTR）。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.COTP">
+            <summary>COTP数据包ID。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.COTP.BuildConnectionRequest">
+            <summary>构建用于ISO-on-TCP的COTP连接请求数据包。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.COTP.IsConnectionConfirm(System.Byte[])">
+            <summary>检查COTP响应是否为有效的连接确认。</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.S7AddressData">
+            <summary>
+            解析后的S7地址数据，用于构建读/写命令。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.SiemensPLCS">
+            <summary>西门子S7 PLC型号枚举。影响PDU大小协商和连接建立。</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Siemens.SiemensPLCS.S200">
+            <summary>S7-200（有限的PPI支持，小PDU大小约240字节）</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Siemens.SiemensPLCS.S300">
+            <summary>S7-300（标准TCP/IP支持）</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Siemens.SiemensPLCS.S400">
+            <summary>S7-400（高端型号，较大的PDU大小）</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Siemens.SiemensPLCS.S1200">
+            <summary>S7-1200（现代型号，需要PDU协商）</summary>
+        </member>
+        <member name="F:PlcCommunication.Protocols.Siemens.SiemensPLCS.S1500">
+            <summary>S7-1500（现代型号，大PDU大小）</summary>
+        </member>
+        <member name="T:PlcCommunication.Protocols.Siemens.SiemensS7Net">
+            <summary>
+            西门子S7 PLC通信客户端。支持S7-200到S7-1500，
+            通过ISO-on-TCP（RFC 1006）在端口102上进行通信。
+            </summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Siemens.SiemensS7Net.LocalTSAP">
+            <summary>本地TSAP，用于连接。对于PG通常为"10.00"。</summary>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Siemens.SiemensS7Net.RemoteTSAP">
+            <summary>远程TSAP，用于连接。对于S7-300 CPU插槽2通常为"02.00"。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.#ctor(PlcCommunication.Protocols.Siemens.SiemensPLCS,System.String,System.Int32)">
+            <summary>
+            创建新的西门子S7客户端。
+            </summary>
+            <param name="plcType">PLC型号（影响PDU大小协商和TSAP默认值）。</param>
+            <param name="ipAddress">PLC IP地址。</param>
+            <param name="port">TCP端口（默认102）。</param>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.#ctor">
+            <summary>
+            创建新的S7客户端（默认为S7-1200，127.0.0.1）。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.ConnectAsync">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.BuildCOTPPacket">
+            <summary>
+            构建COTP连接请求（CR）包。
+            严格按照ISO 8073标准：
+            TPKT头部(4) + COTP CR TPDU:
+              长度指示器(1) + CR标识0xE0(1) + 目标引用(2) + 源引用(2) + 类别选项(1) + 参数
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.NegotiatePDUSize">
+            <summary>
+            S7 PDU大小协商（建立通信）。
+            请求包含完整参数：功能码 + PDU大小 + 最大AMQ调用数 + 最大AMQ应答数。
+            需要 TPKT + COTP DT 封装。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.BuildReadCommand(System.String,System.UInt16)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.WrapS7Message(System.Byte[])">
+            <summary>
+            将 S7 消息封装为 TPKT + COTP DT 格式。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.BuildWriteCommand(System.String,System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.CheckResponse(System.Byte[],System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.GetResponseLength(System.Byte[])">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.ReadBoolAsync(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.WriteAsync(System.String,System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="P:PlcCommunication.Protocols.Siemens.SiemensS7Net.PduLength">
+            <summary>获取协商后的PDU长度，用于参考信息。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.GetS7ErrorDescription(System.Byte,System.Byte)">
+            <summary>获取S7通信错误描述（消息类型0x02的错误码）。</summary>
+        </member>
+        <member name="M:PlcCommunication.Protocols.Siemens.SiemensS7Net.GetS7DataErrorDescription(System.Byte)">
+            <summary>获取S7数据区域返回码描述。</summary>
+        </member>
+        <member name="T:PlcCommunication.Simulation.PlcSimulatorBase">
+            <summary>
+            PLC模拟器基类，提供TCP服务器基础功能。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Simulation.MitsubishiMcSimulator">
+            <summary>
+            三菱MC协议模拟器（3E二进制帧）。
+            支持D、M、X、Y等设备区域的读写。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Simulation.SiemensS7Simulator">
+            <summary>
+            西门子S7协议模拟器。
+            支持M、I、Q、DB区域的读写。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Simulation.ModbusTcpSimulator">
+            <summary>
+            Modbus TCP模拟器。
+            </summary>
+        </member>
+        <member name="T:PlcCommunication.Utilities.SoftBasic">
+            <summary>
+            用于字节/十六进制/数组操作的通用工具方法。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.BytesToHexString(System.Byte[],System.Char)">
+            <summary>
+            将字节数组转换为十六进制字符串，可选择分隔符。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.ByteToHexStringDump(System.Byte[])">
+            <summary>
+            将字节格式化为带有ASCII预览的十六进制转储（类似Wireshark）。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.HexStringToBytes(System.String)">
+            <summary>
+            将十六进制字符串转换为字节数组。接受"0x"前缀，可带或不带分隔符。
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.SpliceArray(System.Byte[],System.Byte[])">
+            <summary>拼接两个字节数组。</summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.SpliceByteArray(System.Byte[][])">
+            <summary>拼接多个字节数组。</summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.ArraySelect(System.Byte[],System.Int32,System.Int32)">
+            <summary>安全地提取子数组。</summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.ByteToBoolArray(System.Byte)">
+            <summary>将一个字节值转换为8个布尔位的数组。</summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftBasic.BoolArrayToByte(System.Boolean[])">
+            <summary>将8个布尔位的数组转换为一个字节。</summary>
+        </member>
+        <member name="T:PlcCommunication.Utilities.SoftByte">
+            <summary>位级操作辅助方法。</summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftByte.SetBit(System.Byte,System.Int32,System.Boolean)">
+            <summary>设置或清除字节中的特定位。</summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftByte.GetBit(System.Byte,System.Int32)">
+            <summary>获取特定位的状态。</summary>
+        </member>
+        <member name="T:PlcCommunication.Utilities.SoftTimer">
+            <summary>
+            High-resolution timer wrapper for measuring operation duration.
+            Uses <see cref="T:System.Diagnostics.Stopwatch"/> internally.
+            </summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftTimer.Start">
+            <summary>Start or restart the timer.</summary>
+        </member>
+        <member name="M:PlcCommunication.Utilities.SoftTimer.Stop">
+            <summary>Stop the timer.</summary>
+        </member>
+        <member name="P:PlcCommunication.Utilities.SoftTimer.ElapsedMs">
+            <summary>Get elapsed time in milliseconds since last <see cref="M:PlcCommunication.Utilities.SoftTimer.Start"/>.</summary>
+        </member>
+    </members>
+</doc>
