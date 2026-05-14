@@ -397,10 +397,12 @@ namespace PlcCommunication.Core
 
             try
             {
+                Trace(TraceLevel.Verbose, $"[BuildReadCommand] address={address}, length={length}");
                 byte[] command = BuildReadCommand(address, length);
                 if (command == null || command.Length == 0)
                     return OperateResult.Fail<byte[]>("Failed to build read command");
 
+                Trace(TraceLevel.Verbose, $"[BuildReadCommand] result={command.Length} bytes: {SoftBasic.BytesToHexString(command)}");
                 return await ReadFromCoreServerAsync(command);
             }
             catch (PlcCommunicationException)
@@ -409,6 +411,7 @@ namespace PlcCommunication.Core
             }
             catch (Exception ex)
             {
+                Trace(TraceLevel.Error, $"[ReadAsync] Exception: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 return OperateResult.Fail<byte[]>($"ReadAsync error: {ex.Message}", ex, -1000);
             }
         }

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using PlcCommunication.Core;
 using PlcCommunication.DataConvert;
 using PlcCommunication.Diagnostics;
+using PlcCommunication.Utilities;
 
 namespace PlcCommunication.Protocols.Mitsubishi
 {
@@ -76,6 +77,7 @@ namespace PlcCommunication.Protocols.Mitsubishi
         protected override byte[] BuildReadCommand(string address, ushort length)
         {
             var (devCode, subCode, devAddress) = ParseAddress(address);
+            Trace(TraceLevel.Verbose, $"[BuildReadCommand] address={address} => devCode=0x{devCode:X2}, subCode=0x{subCode:X2}, devAddress={devAddress}, length={length}");
 
             // 字读取：将字节数转换为字数（每个字2字节）
             int wordCount = (length + 1) / 2;
@@ -124,6 +126,8 @@ namespace PlcCommunication.Protocols.Mitsubishi
             // 读取点数（小端序）
             command[idx++] = (byte)(wordCount & 0xFF);
             command[idx++] = (byte)((wordCount >> 8) & 0xFF);
+
+            Trace(TraceLevel.Verbose, $"[BuildReadCommand] command: {SoftBasic.BytesToHexString(command)}");
 
             return command;
         }
@@ -192,11 +196,14 @@ namespace PlcCommunication.Protocols.Mitsubishi
         /// <inheritdoc/>
         protected override OperateResult<byte[]> CheckResponse(byte[] command, byte[] response)
         {
+            Trace(TraceLevel.Verbose, $"[CheckResponse] response={response.Length} bytes: {SoftBasic.BytesToHexString(response)}");
+            
             if (response.Length < 9)
                 return OperateResult.Fail<byte[]>($"MC response too short: {response.Length}");
 
             // 完成码位于偏移量7-8（小端序）
             ushort completeCode = (ushort)(response[7] | (response[8] << 8));
+            Trace(TraceLevel.Verbose, $"[CheckResponse] completeCode=0x{completeCode:X4}");
 
             if (completeCode != 0)
             {
@@ -211,6 +218,7 @@ namespace PlcCommunication.Protocols.Mitsubishi
             int dataLen = response.Length - 9;
             byte[] result = new byte[dataLen];
             Buffer.BlockCopy(response, 9, result, 0, dataLen);
+            Trace(TraceLevel.Verbose, $"[CheckResponse] data={dataLen} bytes: {SoftBasic.BytesToHexString(result)}");
             return OperateResult.Success(result);
         }
 
@@ -225,11 +233,15 @@ namespace PlcCommunication.Protocols.Mitsubishi
 
             try
             {
+                Trace(TraceLevel.Verbose, $"[ReceiveAsync] Waiting for response, expecting data for {_lastReadWordCount} words...");
+                
                 // 先读取9字节头部
                 byte[] header = new byte[9];
                 int headerRead = await ReadStreamAsync(_stream, header, 0, 9, ct);
                 if (headerRead != 9)
                     return OperateResult.Fail<byte[]>($"Expected 9 header bytes, got {headerRead}");
+
+                Trace(TraceLevel.Verbose, $"[ReceiveAsync] header: {SoftBasic.BytesToHexString(header)}");
 
                 // 检查完成码
                 ushort completeCode = (ushort)(header[7] | (header[8] << 8));
@@ -243,12 +255,16 @@ namespace PlcCommunication.Protocols.Mitsubishi
                 // 数据长度 = 读取点数 * 2（每个字2字节）
                 int expectedDataLen = _lastReadWordCount * 2;
 
+                Trace(TraceLevel.Verbose, $"[ReceiveAsync] completeCode=0, expecting {expectedDataLen} data bytes");
+
                 if (expectedDataLen > 0)
                 {
                     byte[] data = new byte[expectedDataLen];
                     int dataRead = await ReadStreamAsync(_stream, data, 0, expectedDataLen, ct);
                     if (dataRead != expectedDataLen)
                         return OperateResult.Fail<byte[]>($"Expected {expectedDataLen} data bytes, got {dataRead}");
+
+                    Trace(TraceLevel.Verbose, $"[ReceiveAsync] data: {SoftBasic.BytesToHexString(data)}");
 
                     // 合并头部和数据
                     byte[] response = new byte[9 + expectedDataLen];
@@ -265,6 +281,7 @@ namespace PlcCommunication.Protocols.Mitsubishi
             }
             catch (Exception ex)
             {
+                Trace(TraceLevel.Error, $"[ReceiveAsync] Exception: {ex.Message}");
                 return OperateResult.Fail<byte[]>("Receive error", ex, -1000);
             }
         }
