@@ -1,0 +1,68 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+*.vspscc
+*.vssscc
+
+## Visual Studio
+.vs/
+*.vsidx
+*.vspx
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.ilk
+*.meta
+*.obj
+*.pch
+*.tmp
+*.rsp
+*.csproj.user
+*.sln.docstates
+
+## Build
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+## IDE
+.idea/
+*.swp
+*.swo
+*~
+
+## User config (local)
+config.json
+bookmarks.txt

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>10</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon />
+    <AssemblyName>PlcCommunication.Tool</AssemblyName>
+    <RootNamespace>PlcCommunication.Sample</RootNamespace>
+    <Title>PLC 通信调试工具</Title>
+    <Product>PLC 通信调试工具</Product>
+    <Company>ljh</Company>
+    <Authors>ljh</Authors>
+    <Copyright>Copyright © ljh 2024-2026</Copyright>
+    <Description>跨平台跨语言PLC通信调试工具，支持西门子/三菱/欧姆龙/罗克韦尔/Modbus全协议</Description>
+    <Version>2.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PlcCommunication\PlcCommunication.csproj" />
+  </ItemGroup>
+
+</Project>

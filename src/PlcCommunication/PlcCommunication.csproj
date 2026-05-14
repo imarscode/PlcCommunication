@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <LangVersion>10</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>CS1591</NoWarn>
+
+    <!-- 工业物联网底层框架 -->
+    <Title>工业物联网底层框架</Title>
+    <Product>工业物联网底层框架</Product>
+    <Authors>ljh</Authors>
+    <Company>ljh</Company>
+    <Contact>QQ: 3010812967, Email: usmars@qq.com</Contact>
+    <Copyright>Copyright © ljh 2024-2026</Copyright>
+    
+    <!-- NuGet -->
+    <PackageId>PlcCommunication</PackageId>
+    <Version>1.0.0</Version>
+    <AssemblyTitle>工业物联网底层框架</AssemblyTitle>
+    <Description>跨平台跨语言通信，主流PLC与Modbus全协议读写，快速构建上位机/组态/SCADA/MES，赋能工业4.0智能制造。作者：ljh QQ：3010812967</Description>
+    <Summary>跨平台跨语言通信，主流PLC与Modbus全协议读写，快速构建上位机/组态/SCADA/MES，赋能工业4.0智能制造。</Summary>
+    <PackageTags>plc;communication;siemens;s7;modbus;mitsubishi;melsec;omron;fins;allen-bradley;cip;industrial;automation;scada;工业物联网;PLC通信;Modbus</PackageTags>
+    <RepositoryUrl>https://github.com/usmars/PlcCommunication</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/usmars/PlcCommunication</PackageProjectUrl>
+    <PackageReleaseNotes>v1.0.0 首次发布 - 支持7种PLC协议，工业级稳定</PackageReleaseNotes>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    
+    <!-- 程序集信息 -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
+    <NeutralLanguage>zh-CN</NeutralLanguage>
+    <Company>ljh</Company>
+    <Product>工业物联网底层框架</Product>
+    <Description>跨平台跨语言通信，主流PLC与Modbus全协议读写，快速构建上位机/组态/SCADA/MES，赋能工业4.0智能制造。作者：ljh QQ：3010812967</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcCommunication.Tests" />
+  </ItemGroup>
+
+</Project>
