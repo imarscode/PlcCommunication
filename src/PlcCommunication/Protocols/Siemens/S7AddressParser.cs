@@ -73,12 +73,29 @@ namespace PlcCommunication.Protocols.Siemens
 
         private static S7AddressData ParseDBAddress(string address)
         {
-            // 格式：DB{编号}.{类型}{偏移量}
-            // 或 DB{编号}.{类型}{偏移量}.{位}（位访问）
+            // 支持多种格式：
+            // 1. DB{编号}.{类型}{偏移量} — 标准格式，如 DB1.DBW0
+            // 2. DB{类型}{偏移量} — 简写格式，默认 DB1，如 DBW0
+            // 3. DB{编号}.{类型}{偏移量}.{位} — 位访问
 
             int dotIndex = address.IndexOf('.');
+            
             if (dotIndex < 0)
+            {
+                // 没有点号，可能是简写格式如 DBW0, DBD10
+                // 检查是否是 DBX/DBB/DBW/DBD 开头
+                if (address.Length > 3)
+                {
+                    string typePart = address.Substring(2, 1);
+                    if (typePart == "X" || typePart == "B" || typePart == "W" || typePart == "D")
+                    {
+                        // 简写格式，默认 DB1
+                        string afterType = address.Substring(3);
+                        return ParseAreaAddress(address.Substring(2), S7Area.DataBlocks, 1);
+                    }
+                }
                 throw new PlcCommunicationException($"DB address must include area type: {address}");
+            }
 
             string dbNumberStr = address.Substring(2, dotIndex - 2);
             if (!int.TryParse(dbNumberStr, out int dbNumber))
