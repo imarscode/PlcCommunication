@@ -16,11 +16,21 @@ using PlcCommunication.Protocols.Siemens;
 using PlcCommunication.Protocols.Mitsubishi;
 using PlcCommunication.Protocols.Omron;
 using PlcCommunication.Protocols.AllenBradley;
+using PlcCommunication.Simulation;
 
 namespace PlcCommunication.Sample
 {
     public partial class MainForm : Form
     {
+        // ========== 模拟器 ==========
+        private MitsubishiMcSimulator? _mitsubishiSim;
+        private SiemensS7Simulator? _siemensSim;
+        private ModbusTcpSimulator? _modbusSim;
+        private bool _simRunning;
+
+        // ========== 菜单 ==========
+        private MenuStrip _menuStrip;
+        private ToolStripMenuItem _menuSimulator;
         // ========== 连接控件 ==========
         private ComboBox _cmbProtocol;
         private TextBox _txtIp;
@@ -113,6 +123,19 @@ namespace PlcCommunication.Sample
             Font = new Font("Segoe UI", 9F);
             StartPosition = FormStartPosition.CenterScreen;
             KeyPreview = true;
+            
+            // 创建菜单
+            _menuStrip = new MenuStrip();
+            _menuSimulator = new ToolStripMenuItem("模拟器");
+            _menuSimulator.DropDownItems.Add("启动三菱MC模拟器 (端口5006)", null, (s, e) => ToggleSimulator("mitsubishi"));
+            _menuSimulator.DropDownItems.Add("启动西门子S7模拟器 (端口102)", null, (s, e) => ToggleSimulator("siemens"));
+            _menuSimulator.DropDownItems.Add("启动Modbus TCP模拟器 (端口502)", null, (s, e) => ToggleSimulator("modbus"));
+            _menuSimulator.DropDownItems.Add(new ToolStripSeparator());
+            _menuSimulator.DropDownItems.Add("停止所有模拟器", null, (s, e) => StopAllSimulators());
+            _menuStrip.Items.Add(_menuSimulator);
+            Controls.Add(_menuStrip);
+            MainMenuStrip = _menuStrip;
+            
             ResumeLayout(false);
             PerformLayout();
         }
@@ -1370,6 +1393,7 @@ namespace PlcCommunication.Sample
                 await _device.DisconnectAsync();
                 if (_device is IDisposable d) d.Dispose();
             }
+            StopAllSimulators();
             SaveConfig();
             base.OnFormClosing(e);
         }
@@ -1443,6 +1467,114 @@ namespace PlcCommunication.Sample
                 return null;
             }
             return "欧姆龙地址格式：D100, CIO100, W100, H100";
+        }
+
+        // =====================================================================
+        // 模拟器控制
+        // =====================================================================
+
+        private void ToggleSimulator(string type)
+        {
+            try
+            {
+                switch (type)
+                {
+                    case "mitsubishi":
+                        if (_mitsubishiSim?.IsRunning == true)
+                        {
+                            _mitsubishiSim.Stop();
+                            _mitsubishiSim.Dispose();
+                            _mitsubishiSim = null;
+                            LogInfo("三菱MC模拟器已停止");
+                        }
+                        else
+                        {
+                            _mitsubishiSim?.Dispose();
+                            _mitsubishiSim = new MitsubishiMcSimulator(5006);
+                            _mitsubishiSim.Start();
+                            LogInfo("三菱MC模拟器已启动，端口5006");
+                            _txtIp.Text = "127.0.0.1";
+                            _numPort.Value = 5006;
+                            _cmbProtocol.SelectedIndex = 3; // 三菱MC
+                        }
+                        break;
+
+                    case "siemens":
+                        if (_siemensSim?.IsRunning == true)
+                        {
+                            _siemensSim.Stop();
+                            _siemensSim.Dispose();
+                            _siemensSim = null;
+                            LogInfo("西门子S7模拟器已停止");
+                        }
+                        else
+                        {
+                            _siemensSim?.Dispose();
+                            _siemensSim = new SiemensS7Simulator(102);
+                            _siemensSim.Start();
+                            LogInfo("西门子S7模拟器已启动，端口102");
+                            _txtIp.Text = "127.0.0.1";
+                            _numPort.Value = 102;
+                            _cmbProtocol.SelectedIndex = 2; // 西门子S7
+                        }
+                        break;
+
+                    case "modbus":
+                        if (_modbusSim?.IsRunning == true)
+                        {
+                            _modbusSim.Stop();
+                            _modbusSim.Dispose();
+                            _modbusSim = null;
+                            LogInfo("Modbus TCP模拟器已停止");
+                        }
+                        else
+                        {
+                            _modbusSim?.Dispose();
+                            _modbusSim = new ModbusTcpSimulator(502);
+                            _modbusSim.Start();
+                            LogInfo("Modbus TCP模拟器已启动，端口502");
+                            _txtIp.Text = "127.0.0.1";
+                            _numPort.Value = 502;
+                            _cmbProtocol.SelectedIndex = 0; // Modbus TCP
+                        }
+                        break;
+                }
+                UpdateSimulatorMenu();
+            }
+            catch (Exception ex)
+            {
+                LogError($"模拟器启动失败: {ex.Message}");
+            }
+        }
+
+        private void StopAllSimulators()
+        {
+            _mitsubishiSim?.Stop();
+            _mitsubishiSim?.Dispose();
+            _mitsubishiSim = null;
+
+            _siemensSim?.Stop();
+            _siemensSim?.Dispose();
+            _siemensSim = null;
+
+            _modbusSim?.Stop();
+            _modbusSim?.Dispose();
+            _modbusSim = null;
+
+            UpdateSimulatorMenu();
+            LogInfo("所有模拟器已停止");
+        }
+
+        private void UpdateSimulatorMenu()
+        {
+            if (_menuSimulator.DropDownItems.Count < 5) return;
+            
+            ((ToolStripMenuItem)_menuSimulator.DropDownItems[0]).Text = 
+                _mitsubishiSim?.IsRunning == true ? "✓ 停止三菱MC模拟器" : "启动三菱MC模拟器 (端口5006)";
+            ((ToolStripMenuItem)_menuSimulator.DropDownItems[1]).Text = 
+                _siemensSim?.IsRunning == true ? "✓ 停止西门子S7模拟器" : "启动西门子S7模拟器 (端口102)";
+            ((ToolStripMenuItem)_menuSimulator.DropDownItems[2]).Text = 
+                _modbusSim?.IsRunning == true ? "✓ 停止Modbus TCP模拟器" : "启动Modbus TCP模拟器 (端口502)";
         }
     }
 }
