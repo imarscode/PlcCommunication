@@ -493,7 +493,26 @@ namespace PlcCommunication.Protocols.Siemens
             command[22] = (byte)((offset >> 8) & 0xFF);
             command[23] = (byte)(offset & 0xFF);
 
-            return command;
+            // 封装为 TPKT + COTP DT
+            return WrapS7Message(command);
+        }
+
+        /// <summary>
+        /// 将 S7 消息封装为 TPKT + COTP DT 格式。
+        /// </summary>
+        private byte[] WrapS7Message(byte[] s7Message)
+        {
+            // TPKT(4) + COTP DT(3) + S7消息
+            byte[] frame = new byte[4 + 3 + s7Message.Length];
+            frame[0] = 0x03; // TPKT 版本
+            frame[1] = 0x00; // TPKT 保留
+            frame[2] = (byte)((frame.Length >> 8) & 0xFF); // 长度高字节
+            frame[3] = (byte)(frame.Length & 0xFF);        // 长度低字节
+            frame[4] = 0x02; // COTP LI
+            frame[5] = 0xF0; // COTP DT
+            frame[6] = 0x80; // EOT 标志
+            Buffer.BlockCopy(s7Message, 0, frame, 7, s7Message.Length);
+            return frame;
         }
 
         /// <inheritdoc/>
@@ -577,7 +596,8 @@ namespace PlcCommunication.Protocols.Siemens
             // 数据
             Buffer.BlockCopy(data, 0, command, 28, data.Length);
 
-            return command;
+            // 封装为 TPKT + COTP DT
+            return WrapS7Message(command);
         }
 
         // =====================================================================
@@ -587,22 +607,30 @@ namespace PlcCommunication.Protocols.Siemens
         /// <inheritdoc/>
         protected override OperateResult<byte[]> CheckResponse(byte[] command, byte[] response)
         {
-            if (response.Length < 12)
+            // 响应格式：TPKT(4) + COTP DT(3) + S7消息
+            // S7 消息从偏移 7 开始
+            if (response.Length < 19)
                 return OperateResult.Fail<byte[]>($"S7 response too short: {response.Length}");
 
+            // 检查 COTP DT 头部
+            if (response[4] < 2 || response[5] != 0xF0)
+                return OperateResult.Fail<byte[]>($"Invalid COTP DT header in response");
+
+            int s7Offset = 7;
+
             // 检查协议ID
-            if (response[0] != 0x32)
-                return OperateResult.Fail<byte[]>($"Invalid S7 protocol ID: 0x{response[0]:X2}");
+            if (response[s7Offset] != 0x32)
+                return OperateResult.Fail<byte[]>($"Invalid S7 protocol ID: 0x{response[s7Offset]:X2}");
 
             // 检查消息类型
-            byte msgType = response[1];
+            byte msgType = response[s7Offset + 1];
             if (msgType == 0x02)
             {
                 // S7 Ack，可能是错误
-                if (response.Length >= 12)
+                if (response.Length >= s7Offset + 12)
                 {
-                    byte errClass = response[10];
-                    byte errCode = response[11];
+                    byte errClass = response[s7Offset + 10];
+                    byte errCode = response[s7Offset + 11];
                     return OperateResult.Fail<byte[]>(
                         $"S7 error: class=0x{errClass:X2}, code=0x{errCode:X2} - {GetS7ErrorDescription(errClass, errCode)}");
                 }
@@ -613,16 +641,17 @@ namespace PlcCommunication.Protocols.Siemens
                 return OperateResult.Fail<byte[]>($"Unexpected S7 message type: 0x{msgType:X2}");
 
             // 获取参数长度和数据长度
-            int paramLen = (response[6] << 8) | response[7];
-            int dataLen = (response[8] << 8) | response[9];
+            int paramLen = (response[s7Offset + 6] << 8) | response[s7Offset + 7];
+            int dataLen = (response[s7Offset + 8] << 8) | response[s7Offset + 9];
 
             // 检查数据区域的返回码
-            int dataStart = 10 + paramLen;
+            int dataStart = s7Offset + 10 + paramLen;
             if (dataStart + 1 > response.Length)
                 return OperateResult.Fail<byte[]>("S7 response missing data area");
 
             // 根据命令判断是读取还是写入响应
-            bool isRead = command.Length > 10 && command[10] == 0x04;
+            // 命令也是封装过的，需要跳过 TPKT + COTP DT
+            bool isRead = command.Length > 17 && command[7 + 10] == 0x04;
 
             if (isRead)
             {
