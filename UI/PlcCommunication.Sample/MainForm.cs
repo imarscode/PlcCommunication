@@ -718,6 +718,19 @@ namespace PlcCommunication.Sample
         private void UpdateParams()
         {
             foreach (Control c in _pnlParams.Controls) c.Visible = false;
+            
+            // 切换协议时设置默认地址
+            _txtAddress.Text = _cmbProtocol.SelectedIndex switch
+            {
+                0 or 1 => "0",
+                2 => "DB1.DBW0",
+                3 => "D0",
+                4 => "D100",
+                5 => "D100",
+                6 => "MyTag",
+                _ => "0"
+            };
+            
             _lblAddrHint.Text = _cmbProtocol.SelectedIndex switch
             {
                 0 or 1 => "💡 Modbus 地址：0, 1, 2 ... (寄存器偏移) | 线圈: 0~65535 | 保持寄存器: 40001~49999",
@@ -870,7 +883,13 @@ namespace PlcCommunication.Sample
         private async void BtnRead_Click(object? sender, EventArgs e)
         {
             if (!CheckConn()) return;
-            string addr = _txtAddress.Text.Trim(); int len = (int)_numLength.Value;
+            string addr = _txtAddress.Text.Trim();
+            
+            // 地址格式校验
+            var addrError = ValidateAddress(addr);
+            if (addrError != null) { LogWarn(addrError); return; }
+            
+            int len = (int)_numLength.Value;
             _btnRead.Enabled = false;
             try
             {
@@ -1353,6 +1372,77 @@ namespace PlcCommunication.Sample
             }
             SaveConfig();
             base.OnFormClosing(e);
+        }
+
+        // =====================================================================
+        // 地址格式校验
+        // =====================================================================
+
+        /// <summary>校验地址格式，返回 null 表示有效，否则返回错误信息。</summary>
+        private string? ValidateAddress(string addr)
+        {
+            if (string.IsNullOrWhiteSpace(addr)) return "地址不能为空";
+            return _cmbProtocol.SelectedIndex switch
+            {
+                0 or 1 => null, // Modbus 地址格式简单，不做校验
+                2 => ValidateS7Address(addr),
+                3 => ValidateMitsubishiAddress(addr),
+                4 or 5 => ValidateOmronAddress(addr),
+                6 => null, // CIP 使用标签名，不做校验
+                _ => null
+            };
+        }
+
+        private static string? ValidateS7Address(string addr)
+        {
+            addr = addr.ToUpperInvariant();
+            if (addr.StartsWith("DB"))
+            {
+                if (!addr.Contains('.')) return "DB 地址格式：DB1.DBW0, DB1.DBD0, DB1.DBX0.0";
+                return null;
+            }
+            if (addr.Length >= 2)
+            {
+                char area = addr[0];
+                char type = addr[1];
+                if ((area == 'M' || area == 'I' || area == 'Q') &&
+                    (type == 'B' || type == 'W' || type == 'D' || type == 'X' || char.IsDigit(type)))
+                    return null;
+            }
+            if ((addr.StartsWith('T') || addr.StartsWith('C')) && addr.Length > 1)
+                return null;
+            return "S7 地址格式示例：DB1.DBW0, MW0, I0.0, QW0, T0, C0";
+        }
+
+        private static string? ValidateMitsubishiAddress(string addr)
+        {
+            addr = addr.ToUpperInvariant();
+            if (addr.Length == 0) return "地址不能为空";
+            char area = addr[0];
+            if (area == 'D' || area == 'M' || area == 'X' || area == 'Y' ||
+                area == 'B' || area == 'W' || area == 'R' || area == 'S' ||
+                area == 'T' || area == 'C' || area == 'Z')
+            {
+                if (addr.Length == 1) return $"地址 {area} 后需要跟数字，如 {area}0";
+                return null;
+            }
+            return "三菱地址格式：D0, M0, X0, Y0";
+        }
+
+        private static string? ValidateOmronAddress(string addr)
+        {
+            addr = addr.ToUpperInvariant();
+            if (addr.Length == 0) return "地址不能为空";
+            if (addr.StartsWith("CIO") || addr.StartsWith("DM") || addr.StartsWith("WR") ||
+                addr.StartsWith("HR") || addr.StartsWith("AR") || addr.StartsWith("EM"))
+                return null;
+            char area = addr[0];
+            if (area == 'D' || area == 'W' || area == 'H' || area == 'A' || area == 'T' || area == 'C' || area == 'E')
+            {
+                if (addr.Length == 1) return $"地址 {area} 后需要跟数字";
+                return null;
+            }
+            return "欧姆龙地址格式：D100, CIO100, W100, H100";
         }
     }
 }
