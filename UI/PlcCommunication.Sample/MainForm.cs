@@ -120,14 +120,15 @@ namespace PlcCommunication.Sample
         {
             SuspendLayout();
             
-            // 窗体设置
+            // 窗体设置 - 适应更多屏幕尺寸
             Text = "PlcCommunication - PLC 通信调试工具 v2.1";
-            Size = new Size(1400, 900);
-            MinimumSize = new Size(1200, 700);
+            Size = new Size(1100, 700);
+            MinimumSize = new Size(900, 550);
             BackColor = Color.FromArgb(248, 250, 252);
             Font = new Font("Segoe UI", 9F);
             StartPosition = FormStartPosition.CenterScreen;
             KeyPreview = true;
+            WindowState = FormWindowState.Maximized; // 默认最大化
             
             // 创建菜单
             BuildMenu();
@@ -183,10 +184,10 @@ namespace PlcCommunication.Sample
                 RowCount = 2,
                 BackColor = Color.FromArgb(248, 250, 252)
             };
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 100)); // 连接区
+            mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 90)); // 连接区
             mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // 内容区
-            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65));  // 左侧操作
-            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));  // 右侧日志
+            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));  // 左侧操作
+            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));  // 右侧日志
 
             // ========== 第0行：连接区 ==========
             var connPanel = BuildConnectionPanel();
