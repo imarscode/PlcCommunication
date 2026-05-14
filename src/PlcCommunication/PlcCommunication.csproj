@@ -18,7 +18,7 @@
     
     <!-- NuGet -->
     <PackageId>PlcCommunication</PackageId>
-    <Version>1.0.0</Version>
+    <Version>2.1.0</Version>
     <AssemblyTitle>工业物联网底层框架</AssemblyTitle>
     <Description>跨平台跨语言通信，主流PLC与Modbus全协议读写，快速构建上位机/组态/SCADA/MES，赋能工业4.0智能制造。作者：ljh QQ：3010812967</Description>
     <Summary>跨平台跨语言通信，主流PLC与Modbus全协议读写，快速构建上位机/组态/SCADA/MES，赋能工业4.0智能制造。</Summary>
@@ -34,9 +34,9 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     
     <!-- 程序集信息 -->
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
-    <Version>1.0.0</Version>
+    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <FileVersion>2.1.0.0</FileVersion>
+    <Version>2.1.0</Version>
     <NeutralLanguage>zh-CN</NeutralLanguage>
     <Company>ljh</Company>
     <Product>工业物联网底层框架</Product>
