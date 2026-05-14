@@ -265,6 +265,7 @@ namespace PlcCommunication.Protocols.Siemens
         /// <summary>
         /// S7 PDU大小协商（建立通信）。
         /// 请求包含完整参数：功能码 + PDU大小 + 最大AMQ调用数 + 最大AMQ应答数。
+        /// 需要 TPKT + COTP DT 封装。
         /// </summary>
         private async Task<OperateResult> NegotiatePDUSize()
         {
@@ -272,37 +273,50 @@ namespace PlcCommunication.Protocols.Siemens
             {
                 int requestedPDU = _pduLength;
 
-                // S7建立通信请求
+                // S7建立通信请求（纯 S7 消息）
                 // 头部(10) + 参数(8) = 18字节
-                byte[] request = new byte[18];
-                request[0] = 0x32; // 协议ID
-                request[1] = 0x01; // 作业类型
-                request[2] = 0x00; // 保留
-                request[3] = 0x00; // 保留
-                request[4] = (byte)((_pduRef >> 8) & 0xFF); // PDU引用高字节
-                request[5] = (byte)(_pduRef++ & 0xFF);      // PDU引用低字节
-                request[6] = 0x00; // 参数长度高字节
-                request[7] = 0x08; // 参数长度低字节 = 8
-                request[8] = 0x00; // 数据长度高字节
-                request[9] = 0x00; // 数据长度低字节
+                byte[] s7Message = new byte[18];
+                s7Message[0] = 0x32; // 协议ID
+                s7Message[1] = 0x01; // 作业类型
+                s7Message[2] = 0x00; // 保留
+                s7Message[3] = 0x00; // 保留
+                s7Message[4] = (byte)((_pduRef >> 8) & 0xFF); // PDU引用高字节
+                s7Message[5] = (byte)(_pduRef++ & 0xFF);      // PDU引用低字节
+                s7Message[6] = 0x00; // 参数长度高字节
+                s7Message[7] = 0x08; // 参数长度低字节 = 8
+                s7Message[8] = 0x00; // 数据长度高字节
+                s7Message[9] = 0x00; // 数据长度低字节
 
                 // 参数区域（8字节）：
-                request[10] = 0xF0; // 功能码：建立通信
-                request[11] = 0x00; // 保留
+                s7Message[10] = 0xF0; // 功能码：建立通信
+                s7Message[11] = 0x00; // 保留
 
                 // 请求的PDU大小（大端序）
-                request[12] = (byte)((requestedPDU >> 8) & 0xFF);
-                request[13] = (byte)(requestedPDU & 0xFF);
+                s7Message[12] = (byte)((requestedPDU >> 8) & 0xFF);
+                s7Message[13] = (byte)(requestedPDU & 0xFF);
 
                 // 最大AMQ调用数
-                request[14] = 0x01;
+                s7Message[14] = 0x01;
 
                 // 最大AMQ应答数
-                request[15] = 0x01;
+                s7Message[15] = 0x01;
 
                 // 保留
-                request[16] = 0x00;
-                request[17] = 0x00;
+                s7Message[16] = 0x00;
+                s7Message[17] = 0x00;
+
+                // 封装为 TPKT + COTP DT
+                // TPKT(4) + COTP DT(3: LI+0xF0+EOT) + S7消息
+                // COTP DT: 0x02 0xF0 0x80 (长度=2, 类型=DT, EOT=1)
+                byte[] request = new byte[4 + 3 + s7Message.Length];
+                request[0] = 0x03; // TPKT 版本
+                request[1] = 0x00; // TPKT 保留
+                request[2] = (byte)((request.Length >> 8) & 0xFF); // TPKT 长度高字节
+                request[3] = (byte)(request.Length & 0xFF);        // TPKT 长度低字节
+                request[4] = 0x02; // COTP LI (长度指示器，不含自身)
+                request[5] = 0xF0; // COTP DT (数据传输)
+                request[6] = 0x80; // EOT 标志（最后数据单元）
+                Buffer.BlockCopy(s7Message, 0, request, 7, s7Message.Length);
 
                 Trace(TraceLevel.Verbose, $"[S7 PDU Neg] {SoftBasic.BytesToHexString(request)}");
 
@@ -310,7 +324,7 @@ namespace PlcCommunication.Protocols.Siemens
                 await _stream!.WriteAsync(request, 0, request.Length, sendCts.Token);
                 await _stream.FlushAsync(sendCts.Token);
 
-                // 读取S7头部（4字节TPKT => 长度）
+                // 读取TPKT头部（4字节）
                 byte[] header = new byte[4];
                 using var recvCts = new CancellationTokenSource(ReceiveTimeout);
                 int read = await ReadStreamAsync(_stream, header, 0, 4, recvCts.Token);
@@ -321,6 +335,7 @@ namespace PlcCommunication.Protocols.Siemens
                 if (totalLength <= 4)
                     return OperateResult.Fail("Invalid S7 setup response length");
 
+                // 读取剩余数据
                 byte[] response = new byte[totalLength];
                 Buffer.BlockCopy(header, 0, response, 0, 4);
                 if (totalLength > 4)
@@ -331,25 +346,34 @@ namespace PlcCommunication.Protocols.Siemens
                 Trace(TraceLevel.Verbose, $"[S7 PDU Resp] {SoftBasic.BytesToHexString(response)}");
 
                 // 验证响应
-                if (response.Length < 12)
+                // 响应格式：TPKT(4) + COTP DT(3) + S7消息
+                // S7 消息从偏移 7 开始
+                if (response.Length < 18)
                     return OperateResult.Fail("S7 setup response too short");
 
-                if (response[4] != 0x32)
+                // 检查 COTP DT 头部
+                if (response[4] < 2 || response[5] != 0xF0)
+                    return OperateResult.Fail($"Invalid COTP DT header in response");
+
+                // S7 消息从偏移 7 开始
+                int s7Offset = 7;
+                
+                if (response[s7Offset] != 0x32)
                     return OperateResult.Fail("Invalid S7 protocol ID in setup response");
 
                 // 检查错误类型（字节10是功能码，应该是0xF0的反馈0x00表示成功）
                 // 对于建立通信响应，消息类型应该是0x03（Ack Data）
-                if (response[1] != 0x03)
-                    return OperateResult.Fail($"Unexpected S7 message type in setup response: 0x{response[1]:X2}");
+                if (response[s7Offset + 1] != 0x03)
+                    return OperateResult.Fail($"Unexpected S7 message type in setup response: 0x{response[s7Offset + 1]:X2}");
 
                 // 解析协商后的PDU大小
-                // 响应结构：TPKT(4) + S7头(6) + 参数长度(2) + 数据长度(2) + 参数 + 数据
-                // 偏移量：4(TPKT) + 6(S7头) = 10
-                int paramLen = (response[6] << 8) | response[7];
-                int dataLen = (response[8] << 8) | response[9];
+                // 响应结构：TPKT(4) + COTP DT(3) + S7头(10) + 参数
+                // S7 偏移：s7Offset(7)
+                int paramLen = (response[s7Offset + 6] << 8) | response[s7Offset + 7];
+                int dataLen = (response[s7Offset + 8] << 8) | response[s7Offset + 9];
 
-                // 数据区域起始 = 10 + paramLen
-                int dataStart = 10 + paramLen;
+                // 数据区域起始 = s7Offset + 10 + paramLen
+                int dataStart = s7Offset + 10 + paramLen;
                 
                 // 数据区域结构：返回码(1) + 传输大小(1) + 数据长度(2) + 数据
                 if (dataStart + 4 <= response.Length)
